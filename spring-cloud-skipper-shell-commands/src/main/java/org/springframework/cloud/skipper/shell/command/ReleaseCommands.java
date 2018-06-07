@@ -18,6 +18,7 @@ package org.springframework.cloud.skipper.shell.command;
 import javax.validation.constraints.NotNull;
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,16 +30,21 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.deployer.spi.app.DeploymentState;
 import org.springframework.cloud.skipper.ReleaseNotFoundException;
+import org.springframework.cloud.skipper.SkipperException;
 import org.springframework.cloud.skipper.client.SkipperClient;
+import org.springframework.cloud.skipper.domain.CancelRequest;
+import org.springframework.cloud.skipper.domain.CancelResponse;
 import org.springframework.cloud.skipper.domain.ConfigValues;
 import org.springframework.cloud.skipper.domain.Info;
 import org.springframework.cloud.skipper.domain.PackageIdentifier;
 import org.springframework.cloud.skipper.domain.Release;
+import org.springframework.cloud.skipper.domain.RollbackRequest;
 import org.springframework.cloud.skipper.domain.UpgradeProperties;
 import org.springframework.cloud.skipper.domain.UpgradeRequest;
 import org.springframework.cloud.skipper.shell.command.support.DeploymentStateDisplay;
 import org.springframework.cloud.skipper.shell.command.support.TableUtils;
 import org.springframework.cloud.skipper.shell.command.support.YmlUtils;
+import org.springframework.cloud.skipper.support.DurationUtils;
 import org.springframework.shell.standard.ShellComponent;
 import org.springframework.shell.standard.ShellMethod;
 import org.springframework.shell.standard.ShellOption;
@@ -126,13 +132,23 @@ public class ReleaseCommands extends AbstractSkipperCommand {
 			@ShellOption(help = "the name of the package to use for the upgrade") String packageName,
 			@ShellOption(help = "the version of the package to use for the upgrade, if not specified latest version will be used", defaultValue = NULL) String packageVersion,
 			@ShellOption(help = "specify values in a YAML file", defaultValue = NULL) File file,
+			@ShellOption(help = "the expression for upgrade timeout", defaultValue = NULL) String timeoutExpression,
+			@ShellOption(help = "specify CF manifest YAML file", defaultValue = NULL) File cfManifestYaml,
 			@ShellOption(help = "the comma separated set of properties to override during upgrade", defaultValue = NULL) String properties)
 			throws IOException {
 		// Commented out until https://github.com/spring-cloud/spring-cloud-skipper/issues/263 is
 		// addressed
 		// assertMutuallyExclusiveFileAndProperties(file, properties);
+		if (cfManifestYaml != null && cfManifestYaml.exists()) {
+			// TODO: when cfManifestYml is specified, one can not pass properties YAML as an option
+			StringBuilder stringBuilder = new StringBuilder();
+			stringBuilder.append(properties);
+			stringBuilder.append(",");
+			stringBuilder.append("spec.cfManifest=" + YmlUtils.getYamlConfigValues(cfManifestYaml, null));
+			properties = stringBuilder.toString();
+		}
 		Release release = skipperClient
-				.upgrade(getUpgradeRequest(releaseName, packageName, packageVersion, file, properties));
+				.upgrade(getUpgradeRequest(releaseName, packageName, packageVersion, file, properties, timeoutExpression));
 		StringBuilder sb = new StringBuilder();
 		sb.append(release.getName() + " has been upgraded.  Now at version v" + release.getVersion() + ".");
 		return sb.toString();
@@ -159,7 +175,7 @@ public class ReleaseCommands extends AbstractSkipperCommand {
 	}
 
 	private UpgradeRequest getUpgradeRequest(String releaseName, String packageName, String packageVersion,
-			File propertiesFile, String propertiesToOverride) throws IOException {
+			File propertiesFile, String propertiesToOverride, String timeoutExpression) throws IOException {
 		UpgradeRequest upgradeRequest = new UpgradeRequest();
 		UpgradeProperties upgradeProperties = new UpgradeProperties();
 		upgradeProperties.setReleaseName(releaseName);
@@ -175,6 +191,10 @@ public class ReleaseCommands extends AbstractSkipperCommand {
 		packageIdentifier.setPackageVersion(packageVersion);
 		upgradeRequest.setPackageIdentifier(packageIdentifier);
 		upgradeRequest.setPackageIdentifier(packageIdentifier);
+		Duration duration = DurationUtils.convert(timeoutExpression);
+		if (duration != null) {
+			upgradeRequest.setTimeout(duration.toMillis());
+		}
 		return upgradeRequest;
 	}
 
@@ -182,8 +202,16 @@ public class ReleaseCommands extends AbstractSkipperCommand {
 	public String rollback(
 			@ShellOption(help = "the name of the release to rollback") String releaseName,
 			@ShellOption(help = "the specific release version to rollback to. " +
-					"Not specifying the value rolls back to the previous release.", defaultValue = "0") int releaseVersion) {
-		Release release = skipperClient.rollback(releaseName, releaseVersion);
+					"Not specifying the value rolls back to the previous release.", defaultValue = "0") int releaseVersion,
+			@ShellOption(help = "the expression for rollback timeout", defaultValue = NULL) String timeoutExpression) {
+
+		RollbackRequest rollbackRequest = new RollbackRequest(releaseName, releaseVersion);
+		Duration duration = DurationUtils.convert(timeoutExpression);
+		if (duration != null) {
+			rollbackRequest.setTimeout(duration.toMillis());
+		}
+
+		Release release = skipperClient.rollback(rollbackRequest);
 		StringBuilder sb = new StringBuilder();
 		sb.append(release.getName() + " has been rolled back.  Now at version v" + release.getVersion() + ".");
 		return sb.toString();
@@ -197,6 +225,16 @@ public class ReleaseCommands extends AbstractSkipperCommand {
 		StringBuilder sb = new StringBuilder();
 		sb.append(releaseName + " has been deleted.");
 		return sb.toString();
+	}
+
+	@ShellMethod(key = "release cancel", value = "Request a cancellation of current release operation.")
+	public String cancel(
+			@ShellOption(help = "the name of the release to cancel") String releaseName) {
+		CancelResponse cancelResponse = this.skipperClient.cancel(new CancelRequest(releaseName));
+		if (cancelResponse != null && cancelResponse.getAccepted() != null && cancelResponse.getAccepted()) {
+			return "Cancel request for release " + releaseName + " sent";			
+		}
+		throw new SkipperException("Cancel request for release " + releaseName + " not accepted");
 	}
 
 	@ShellMethod(key = "release list", value = "List the latest version of releases with status of deployed or failed.")

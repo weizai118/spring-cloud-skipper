@@ -27,6 +27,7 @@ import org.springframework.cloud.skipper.domain.InstallProperties;
 import org.springframework.cloud.skipper.domain.InstallRequest;
 import org.springframework.cloud.skipper.domain.PackageMetadata;
 import org.springframework.cloud.skipper.domain.Release;
+import org.springframework.cloud.skipper.domain.RollbackRequest;
 import org.springframework.cloud.skipper.domain.UpgradeRequest;
 import org.springframework.cloud.skipper.server.deployer.ReleaseAnalysisReport;
 import org.springframework.messaging.Message;
@@ -98,6 +99,7 @@ public class SkipperStateMachineService {
 		Message<SkipperEvents> message = MessageBuilder
 				.withPayload(SkipperEvents.UPGRADE)
 				.setHeader(SkipperEventHeaders.UPGRADE_REQUEST, upgradeRequest)
+				.setHeader(SkipperEventHeaders.UPGRADE_TIMEOUT, upgradeRequest.getTimeout())
 				.build();
 		return handleMessageAndWait(message, releaseName, SkipperStates.UPGRADE_WAIT_TARGET_APPS);
 	}
@@ -120,18 +122,32 @@ public class SkipperStateMachineService {
 	/**
 	 * Rollback release.
 	 *
-	 * @param releaseName the release name
-	 * @param rollbackVersion the rollback version
+	 * @param rollbackRequest the rollback request
 	 * @return the release
 	 */
-	public Release rollbackRelease(final String releaseName, final int rollbackVersion) {
+	public Release rollbackRelease(RollbackRequest rollbackRequest) {
 		Message<SkipperEvents> message = MessageBuilder
 				.withPayload(SkipperEvents.ROLLBACK)
-				.setHeader(SkipperEventHeaders.RELEASE_NAME, releaseName)
-				.setHeader(SkipperEventHeaders.ROLLBACK_VERSION, rollbackVersion)
+				.setHeader(SkipperEventHeaders.RELEASE_NAME, rollbackRequest.getReleaseName())
+				.setHeader(SkipperEventHeaders.ROLLBACK_VERSION, rollbackRequest.getVersion())
+				.setHeader(SkipperEventHeaders.ROLLBACK_REQUEST, rollbackRequest)
 				.build();
-		return handleMessageAndWait(message, releaseName, SkipperStates.UPGRADE_WAIT_TARGET_APPS,
+		return handleMessageAndWait(message, rollbackRequest.getReleaseName(), SkipperStates.UPGRADE_WAIT_TARGET_APPS,
 				SkipperStates.INITIAL);
+	}
+
+	/**
+	 * Send an event to attempt a cancellation of an existing operation.
+	 *
+	 * @param releaseName the release name
+	 * @return true if event were sent
+	 */
+	public boolean cancelRelease(String releaseName) {
+		Message<SkipperEvents> message = MessageBuilder
+				.withPayload(SkipperEvents.UPGRADE_CANCEL)
+				.setHeader(SkipperEventHeaders.RELEASE_NAME, releaseName)
+				.build();
+		return handleMessageAndCheckAccept(message, releaseName);
 	}
 
 	private Release installReleaseInternal(InstallRequest installRequest, Long id, InstallProperties installProperties) {
@@ -152,6 +168,11 @@ public class SkipperStateMachineService {
 
 	private Release handleMessageAndWait(Message<SkipperEvents> message, String machineId) {
 		return handleMessageAndWait(message, machineId, SkipperStates.INITIAL);
+	}
+
+	private boolean handleMessageAndCheckAccept(Message<SkipperEvents> message, String machineId) {
+		StateMachine<SkipperStates, SkipperEvents> stateMachine = stateMachineService.acquireStateMachine(machineId);
+		return stateMachine.sendEvent(message);
 	}
 
 	private Release handleMessageAndWait(Message<SkipperEvents> message, String machineId, SkipperStates... statesToWait) {
@@ -450,6 +471,11 @@ public class SkipperStateMachineService {
 		 * Header for rollback version.
 		 */
 		public static final String ROLLBACK_VERSION = "ROLLBACK_VERSION";
+
+		/**
+		 * Header for {@link RollbackRequest}.
+		 */
+		public static final String ROLLBACK_REQUEST = "ROLLBACK_REQUEST";
 
 		/**
 		 * SCDF specific extension to allow deletion of

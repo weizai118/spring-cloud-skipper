@@ -20,7 +20,6 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.cloud.skipper.domain.Release;
 import org.springframework.cloud.skipper.domain.Status;
 import org.springframework.cloud.skipper.domain.StatusCode;
@@ -28,7 +27,6 @@ import org.springframework.cloud.skipper.server.deployer.ReleaseManager;
 import org.springframework.cloud.skipper.server.domain.AppDeployerData;
 import org.springframework.cloud.skipper.server.repository.AppDeployerDataRepository;
 import org.springframework.cloud.skipper.server.repository.ReleaseRepository;
-import org.springframework.context.event.EventListener;
 import org.springframework.dao.DataAccessException;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,39 +48,37 @@ public class HandleHealthCheckStep {
 
 	private final DeleteStep deleteStep;
 
-	private final HealthCheckProperties healthCheckProperties;
-
-	private ReleaseManager releaseManager;
+	private final ReleaseManager releaseManager;
 
 	public HandleHealthCheckStep(ReleaseRepository releaseRepository,
 			AppDeployerDataRepository appDeployerDataRepository,
 			DeleteStep deleteStep,
-			HealthCheckProperties healthCheckProperties) {
+			ReleaseManager releaseManager) {
 		this.releaseRepository = releaseRepository;
 		this.appDeployerDataRepository = appDeployerDataRepository;
 		this.deleteStep = deleteStep;
-		this.healthCheckProperties = healthCheckProperties;
+		this.releaseManager = releaseManager;
 	}
 
 	@Transactional
 	public void handleHealthCheck(boolean healthy, Release existingRelease,
 			List<String> applicationNamesToUpgrade,
-			Release replacingRelease) {
+			Release replacingRelease, Long timeout, boolean cancel, boolean rollback) {
 		if (healthy) {
-			updateReplacingReleaseState(replacingRelease);
+			updateReplacingReleaseState(replacingRelease, rollback);
 			deleteExistingRelease(existingRelease, applicationNamesToUpgrade);
 		}
 		else {
-			deleteReplacingRelease(replacingRelease);
+			deleteReplacingRelease(replacingRelease, timeout, cancel);
 		}
 	}
 
-	private void updateReplacingReleaseState(Release replacingRelease) {
+	private void updateReplacingReleaseState(Release replacingRelease, boolean rollback) {
 		// Update Status in DB
 		Status status = new Status();
 		status.setStatusCode(StatusCode.DEPLOYED);
 		replacingRelease.getInfo().setStatus(status);
-		replacingRelease.getInfo().setDescription("Upgrade complete");
+		replacingRelease.getInfo().setDescription(rollback ? "Rollback complete" : "Upgrade complete");
 		this.releaseRepository.save(replacingRelease);
 		logger.info("Release {}-v{} has been DEPLOYED", replacingRelease.getName(),
 				replacingRelease.getVersion());
@@ -90,18 +86,21 @@ public class HandleHealthCheckStep {
 				replacingRelease.getVersion());
 	}
 
-	private void deleteReplacingRelease(Release replacingRelease) {
+	private void deleteReplacingRelease(Release replacingRelease, Long timeout, boolean cancel) {
 		try {
-			logger.error("New release " + replacingRelease.getName() + " was not detected as healthy after " +
-					this.healthCheckProperties.getTimeoutInMillis() + " milliseconds.  " +
-					"Keeping existing release, and Deleting apps of replacing release");
+			if (!cancel) {
+				logger.error("New release " + replacingRelease.getName() + " was not detected as healthy after " + timeout
+						+ " milliseconds.  " + "Keeping existing release, and Deleting apps of replacing release");				
+			}
 			this.releaseManager.delete(replacingRelease);
 			Status status = new Status();
 			status.setStatusCode(StatusCode.FAILED);
 			replacingRelease.getInfo().setStatus(status);
 			replacingRelease.getInfo().setStatus(status);
-			replacingRelease.getInfo().setDescription("Did not detect apps in replacing release as healthy after " +
-					this.healthCheckProperties.getTimeoutInMillis() + " ms.");
+			String desc = cancel ? "Cancelled after " + timeout + " ms."
+					: "Did not detect apps in replacing release as healthy after " + timeout + " ms.";
+			replacingRelease.getInfo()
+					.setDescription(desc);
 			this.releaseRepository.save(replacingRelease);
 		}
 		catch (DataAccessException e) {
@@ -148,11 +147,5 @@ public class HandleHealthCheckStep {
 			logger.info("Release {}-v{} could not be deleted.", existingRelease.getName(),
 					existingRelease.getVersion());
 		}
-	}
-
-	@EventListener
-	public void initialize(ApplicationReadyEvent event) {
-		// NOTE circular ref will go away with introduction of state machine.
-		this.releaseManager = event.getApplicationContext().getBean(ReleaseManager.class);
 	}
 }

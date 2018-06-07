@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.springframework.cloud</groupId>
     <artifactId>spring-cloud-skipper-parent</artifactId>
-    <version>1.0.3.BUILD-SNAPSHOT</version>
+    <version>1.1.0.BUILD-SNAPSHOT</version>
     <name>Spring Cloud Skipper</name>
     <packaging>pom</packaging>
     <organization>
@@ -31,24 +31,26 @@
 
         <spring.version>4.3.7.RELEASE</spring.version>
         <spring-shell.version>2.0.1.RELEASE</spring-shell.version>
-        <spring-statemachine.version>1.2.11.BUILD-SNAPSHOT</spring-statemachine.version>
+        <spring-statemachine.version>1.2.11.RELEASE</spring-statemachine.version>
 
         <!-- NOTE: Make sure to update `spring-cloud-build` version and `spring-cloud-dependencies` version (spring-cloud.version)
         are in sync with the https://github.com/spring-cloud/spring-cloud-release/blob/master/pom.xml updates for the respective
         release versions -->
         <spring-cloud.version>Dalston.SR5</spring-cloud.version>
-        <spring-cloud-deployer.version>1.3.1.RELEASE</spring-cloud-deployer.version>
-        <spring-cloud-deployer-local.version>1.3.4.RELEASE</spring-cloud-deployer-local.version>
-        <spring-cloud-deployer-cloudfoundry.version>1.3.1.RELEASE</spring-cloud-deployer-cloudfoundry.version>
-        <spring-cloud-deployer-kubernetes.version>1.3.3.RELEASE</spring-cloud-deployer-kubernetes.version>
+        <spring-cloud-deployer.version>1.3.2.RELEASE</spring-cloud-deployer.version>
+        <spring-cloud-deployer-local.version>1.3.6.BUILD-SNAPSHOT</spring-cloud-deployer-local.version>
+	<!-- note - check version of reactor at deployer-cf/cf-java-client uses -->
+        <spring-cloud-deployer-cloudfoundry.version>1.4.0.RELEASE</spring-cloud-deployer-cloudfoundry.version>
+        <reactor.version>3.1.5.RELEASE</reactor.version>
+        <spring-cloud-deployer-kubernetes.version>1.3.4.RELEASE</spring-cloud-deployer-kubernetes.version>
 
         <dockerfile-maven-plugin.version>1.3.6</dockerfile-maven-plugin.version>
-        <zeroturnaround.version>1.11</zeroturnaround.version>
+        <zeroturnaround.version>1.13</zeroturnaround.version>
         <spring-restdocs.version>1.2.2.RELEASE</spring-restdocs.version>
         <java-semver.version>0.9.0</java-semver.version>
         <spring-common-security>1.0.0.RELEASE</spring-common-security>
 
-        <reactor.version>3.0.7.RELEASE</reactor.version>
+
         <jsonpath.version>2.2.0</jsonpath.version>
         <commons-lang.version>3.4</commons-lang.version>
         <equalverifier.version>2.4.1</equalverifier.version>
@@ -104,47 +106,47 @@
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-skipper-autoconfigure</artifactId>
-                <version>1.0.3.BUILD-SNAPSHOT</version>
+                <version>1.1.0.BUILD-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-skipper-client</artifactId>
-                <version>1.0.3.BUILD-SNAPSHOT</version>
+                <version>1.1.0.BUILD-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-skipper</artifactId>
-                <version>1.0.3.BUILD-SNAPSHOT</version>
+                <version>1.1.0.BUILD-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-skipper-server-core</artifactId>
-                <version>1.0.3.BUILD-SNAPSHOT</version>
+                <version>1.1.0.BUILD-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-skipper-server</artifactId>
-                <version>1.0.3.BUILD-SNAPSHOT</version>
+                <version>1.1.0.BUILD-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-skipper-shell</artifactId>
-                <version>1.0.3.BUILD-SNAPSHOT</version>
+                <version>1.1.0.BUILD-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-skipper-shell-commands</artifactId>
-                <version>1.0.3.BUILD-SNAPSHOT</version>
+                <version>1.1.0.BUILD-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-skipper-platform-cloudfoundry</artifactId>
-                <version>1.0.3.BUILD-SNAPSHOT</version>
+                <version>1.1.0.BUILD-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-skipper-platform-kubernetes</artifactId>
-                <version>1.0.3.BUILD-SNAPSHOT</version>
+                <version>1.1.0.BUILD-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>org.springframework.cloud</groupId>

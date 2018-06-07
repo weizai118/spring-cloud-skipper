@@ -22,7 +22,6 @@ import java.util.Map;
 
 import org.junit.Test;
 
-import org.springframework.cloud.skipper.SkipperException;
 import org.springframework.cloud.skipper.TestResourceUtils;
 import org.springframework.util.StreamUtils;
 
@@ -57,14 +56,9 @@ public class SpringCloudDeployerApplicationManifestReaderTests {
 		String manifestYaml = StreamUtils.copyToString(
 				TestResourceUtils.qualifiedResource(getClass(), "erroneous-manifest.yml").getInputStream(),
 				Charset.defaultCharset());
-		try {
-			List<SpringCloudDeployerApplicationManifest> applicationSpecList = this.applicationManifestReader
-					.read(manifestYaml);
-			fail("Expected IllegalStateException when non matching appKinds are found");
-		}
-		catch (SkipperException e) {
-			assertThat(e.getMessage()).isEqualTo("No reader available to read all the kind SpringBootApp1");
-		}
+		List<SpringCloudDeployerApplicationManifest> applicationSpecList = this.applicationManifestReader
+				.read(manifestYaml);
+		assertThat(applicationSpecList.isEmpty()).isTrue();
 	}
 
 	private void assertTimeOrLogApp(SpringCloudDeployerApplicationManifest applicationSpec) {
@@ -116,7 +110,7 @@ public class SpringCloudDeployerApplicationManifestReaderTests {
 				.isEqualTo("maven://org.springframework.cloud.stream.app:log-sink-rabbit:jar:metadata:1.2.0.RELEASE");
 		assertThat(spec.getApplicationProperties()).hasSize(2);
 		assertThat(spec.getApplicationProperties()).containsEntry("log.level", "INFO");
-		assertThat(spec.getApplicationProperties()).containsEntry("log.expression", "hellobaby");
+		assertThat(spec.getApplicationProperties()).containsEntry("log.expression", "hello baby");
 
 		assertThat(spec.getDeploymentProperties()).hasSize(2);
 		assertThat(spec.getDeploymentProperties()).containsEntry("memory", "1024");

@@ -18,12 +18,15 @@ package org.springframework.cloud.skipper.client;
 import java.util.List;
 
 import org.springframework.cloud.skipper.domain.AboutResource;
+import org.springframework.cloud.skipper.domain.CancelRequest;
+import org.springframework.cloud.skipper.domain.CancelResponse;
 import org.springframework.cloud.skipper.domain.Deployer;
 import org.springframework.cloud.skipper.domain.Info;
 import org.springframework.cloud.skipper.domain.InstallRequest;
 import org.springframework.cloud.skipper.domain.PackageMetadata;
 import org.springframework.cloud.skipper.domain.Release;
 import org.springframework.cloud.skipper.domain.Repository;
+import org.springframework.cloud.skipper.domain.RollbackRequest;
 import org.springframework.cloud.skipper.domain.Template;
 import org.springframework.cloud.skipper.domain.UpgradeRequest;
 import org.springframework.cloud.skipper.domain.UploadRequest;
@@ -34,6 +37,7 @@ import org.springframework.hateoas.Resources;
  *
  * @author Mark Pollack
  * @author Ilayaperumal Gopinathan
+ * @author Janne Valkealahti
  */
 public interface SkipperClient {
 
@@ -98,11 +102,30 @@ public interface SkipperClient {
 	/**
 	 * Rollback a specific release.
 	 *
+	 * @param rollbackRequest the rollback request
+	 * @return the rolled back {@link Release}
+	 */
+	Release rollback(RollbackRequest rollbackRequest);
+
+	/**
+	 * Rollback a specific release.
+	 *
 	 * @param releaseName the release name
 	 * @param releaseVersion the release version
 	 * @return the rolled back {@link Release}
+	 * @see #rollback(RollbackRequest)
+	 * @deprecated use rollback method taking a rollback request
 	 */
+	@Deprecated
 	Release rollback(String releaseName, int releaseVersion);
+
+	/**
+	 * Sends a cancel request for current release operation
+	 * 
+	 * @param cancelRequest the cancel request
+	 * @return the cancel response
+	 */
+	CancelResponse cancel(CancelRequest cancelRequest);
 
 	/**
 	 * List the latest version of releases with status of deployed or failed.

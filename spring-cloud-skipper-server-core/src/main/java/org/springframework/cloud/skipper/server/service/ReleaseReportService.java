@@ -17,12 +17,18 @@ package org.springframework.cloud.skipper.server.service;
 
 import java.util.Map;
 
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.Yaml;
+
+import org.springframework.cloud.skipper.SkipperException;
+import org.springframework.cloud.skipper.domain.ConfigValues;
 import org.springframework.cloud.skipper.domain.Info;
 import org.springframework.cloud.skipper.domain.Manifest;
 import org.springframework.cloud.skipper.domain.Package;
 import org.springframework.cloud.skipper.domain.PackageIdentifier;
 import org.springframework.cloud.skipper.domain.PackageMetadata;
 import org.springframework.cloud.skipper.domain.Release;
+import org.springframework.cloud.skipper.domain.RollbackRequest;
 import org.springframework.cloud.skipper.domain.UpgradeProperties;
 import org.springframework.cloud.skipper.domain.UpgradeRequest;
 import org.springframework.cloud.skipper.server.deployer.ReleaseAnalysisReport;
@@ -33,6 +39,7 @@ import org.springframework.cloud.skipper.server.util.ConfigValueUtils;
 import org.springframework.cloud.skipper.server.util.ManifestUtils;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 
 /**
  * @author Mark Pollack
@@ -56,18 +63,21 @@ public class ReleaseReportService {
 		this.packageService = packageService;
 		this.releaseManager = releaseManager;
 	}
-
+	
 	/**
 	 * Merges the configuration values for the replacing release, creates the manfiest, and
 	 * creates the Report for the next stage of upgrading a Release.
+	 *
 	 * @param upgradeRequest containing the {@link UpgradeProperties} and
 	 * {@link PackageIdentifier} for the update.
+	 * @param rollbackRequest containing the rollback request if available
 	 * @param initial the flag indicating this is initial report creation
 	 * @return A report of what needs to change to bring the current release to the requested
 	 * release
 	 */
 	@Transactional
-	public ReleaseAnalysisReport createReport(UpgradeRequest upgradeRequest, boolean initial) {
+	public ReleaseAnalysisReport createReport(UpgradeRequest upgradeRequest, RollbackRequest rollbackRequest,
+			boolean initial) {
 		Assert.notNull(upgradeRequest.getUpgradeProperties(), "UpgradeProperties can not be null");
 		Assert.notNull(upgradeRequest.getPackageIdentifier(), "PackageIdentifier can not be null");
 		UpgradeProperties upgradeProperties = upgradeRequest.getUpgradeProperties();
@@ -81,27 +91,61 @@ public class ReleaseReportService {
 
 		// if we're about to save new release during this report, create
 		// or restore replacing one.
-		Release replacingRelease = null;
+		Release tempReplacingRelease = null;
 		if (initial) {
-			replacingRelease = createReleaseForUpgrade(packageMetadata, latestRelease.getVersion() + 1,
-					upgradeProperties, existingRelease.getPlatformName());
+			tempReplacingRelease = createReleaseForUpgrade(packageMetadata, latestRelease.getVersion() + 1,
+					upgradeProperties, existingRelease.getPlatformName(), rollbackRequest);
 		}
 		else {
-			replacingRelease = this.releaseRepository.findByNameAndVersion(
+			tempReplacingRelease = this.releaseRepository.findByNameAndVersion(
 					upgradeRequest.getUpgradeProperties().getReleaseName(), latestRelease.getVersion());
 		}
+		// Carry over customized config values from replacing release so updates are additive with property changes.
+		Release replacingRelease = updateReplacingReleaseConfigValues(latestRelease, tempReplacingRelease);
 
-		Map<String, Object> model = ConfigValueUtils.mergeConfigValues(replacingRelease.getPkg(),
+		Map<String, Object> mergedReplacingReleaseModel = ConfigValueUtils.mergeConfigValues(replacingRelease.getPkg(),
 				replacingRelease.getConfigValues());
-		String manifestData = ManifestUtils.createManifest(replacingRelease.getPkg(), model);
+
+		String manifestData = ManifestUtils.createManifest(replacingRelease.getPkg(), mergedReplacingReleaseModel);
 		Manifest manifest = new Manifest();
 		manifest.setData(manifestData);
 		replacingRelease.setManifest(manifest);
 		return this.releaseManager.createReport(existingRelease, replacingRelease, initial);
 	}
 
+	private Release updateReplacingReleaseConfigValues(Release targetRelease, Release replacingRelease) {
+		Map<String, Object> targetConfigValueMap = getConfigValuesAsMap(targetRelease.getConfigValues());
+		Map<String, Object> replacingRelaseConfigValueMap = getConfigValuesAsMap(replacingRelease.getConfigValues());
+		if (targetConfigValueMap != null && replacingRelaseConfigValueMap != null) {
+			ConfigValueUtils.merge(targetConfigValueMap, replacingRelaseConfigValueMap);
+			DumperOptions dumperOptions = new DumperOptions();
+			dumperOptions.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+			dumperOptions.setPrettyFlow(true);
+			Yaml yaml = new Yaml(dumperOptions);
+			ConfigValues mergedConfigValues = new ConfigValues();
+			mergedConfigValues.setRaw(yaml.dump(targetConfigValueMap));
+			replacingRelease.setConfigValues(mergedConfigValues);
+		}
+		return replacingRelease;
+	}
+
+	private Map<String, Object> getConfigValuesAsMap(ConfigValues configValues) {
+		Yaml yaml = new Yaml();
+		if (StringUtils.hasText(configValues.getRaw())) {
+			Object data = yaml.load(configValues.getRaw());
+			if (data instanceof Map) {
+				return (Map<String, Object>) yaml.load(configValues.getRaw());
+			}
+			else {
+				throw new SkipperException("Was expecting override values to produce a Map, instead got class = " +
+						data.getClass() + "overrideValues.getRaw() = " + configValues.getRaw());
+			}
+		}
+		return null;
+	}
+
 	private Release createReleaseForUpgrade(PackageMetadata packageMetadata, Integer newVersion,
-			UpgradeProperties upgradeProperties, String platformName) {
+			UpgradeProperties upgradeProperties, String platformName, RollbackRequest rollbackRequest) {
 		Assert.notNull(upgradeProperties, "Upgrade Properties can not be null");
 		Package packageToInstall = this.packageService.downloadPackage(packageMetadata);
 		Release release = new Release();
@@ -110,7 +154,9 @@ public class ReleaseReportService {
 		release.setConfigValues(upgradeProperties.getConfigValues());
 		release.setPkg(packageToInstall);
 		release.setVersion(newVersion);
-		Info info = Info.createNewInfo("Upgrade install underway");
+		// we simply differentiate between upgrade/rollback if we know there is a rollback request
+		Info info = Info
+				.createNewInfo(rollbackRequest == null ? "Upgrade install underway" : "Rollback install underway");
 		release.setInfo(info);
 		return release;
 	}

@@ -53,15 +53,16 @@ public class SimpleRedBlackUpgradeStrategy implements UpgradeStrategy {
 
 	@Override
 	public void accept(Release existingRelease, Release replacingRelease,
-			ReleaseAnalysisReport releaseAnalysisReport) {
+			ReleaseAnalysisReport releaseAnalysisReport, boolean rollback) {
 		this.handleHealthCheckStep.handleHealthCheck(true, existingRelease,
-				releaseAnalysisReport.getApplicationNamesToUpgrade(), replacingRelease);
+				releaseAnalysisReport.getApplicationNamesToUpgrade(), replacingRelease, null, false, rollback);
 	}
 
 	@Override
-	public void cancel(Release existingRelease, Release replacingRelease, ReleaseAnalysisReport releaseAnalysisReport) {
+	public void cancel(Release existingRelease, Release replacingRelease, ReleaseAnalysisReport releaseAnalysisReport,
+			Long timeout, boolean cancel, boolean rollback) {
 		this.handleHealthCheckStep.handleHealthCheck(false, existingRelease,
-				releaseAnalysisReport.getApplicationNamesToUpgrade(), replacingRelease);
+				releaseAnalysisReport.getApplicationNamesToUpgrade(), replacingRelease, timeout, cancel, rollback);
 	}
 
 }

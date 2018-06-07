@@ -41,6 +41,7 @@ import org.springframework.cloud.skipper.server.deployer.ReleaseAnalysisReport;
 import org.springframework.cloud.skipper.server.deployer.ReleaseManager;
 import org.springframework.cloud.skipper.server.deployer.strategies.DeployAppStep;
 import org.springframework.cloud.skipper.server.deployer.strategies.HandleHealthCheckStep;
+import org.springframework.cloud.skipper.server.deployer.strategies.HealthCheckProperties;
 import org.springframework.cloud.skipper.server.deployer.strategies.HealthCheckStep;
 import org.springframework.cloud.skipper.server.deployer.strategies.UpgradeStrategy;
 import org.springframework.cloud.skipper.server.repository.ReleaseRepository;
@@ -123,6 +124,9 @@ public class StateMachineTests {
 
 	@MockBean
 	private ReleaseRepository releaseRepository;
+
+	@MockBean
+	private HealthCheckProperties healthCheckProperties;
 
 	@SpyBean
 	private UpgradeCancelAction upgradeCancelAction;
@@ -208,7 +212,7 @@ public class StateMachineTests {
 
 	@Test
 	public void testRestoreFromUpgradeUsingUpgradeRequest() throws Exception {
-		Mockito.when(releaseReportService.createReport(any(), any(boolean.class))).thenReturn(new ReleaseAnalysisReport(new ArrayList<>(),
+		Mockito.when(releaseReportService.createReport(any(), any(), any(boolean.class))).thenReturn(new ReleaseAnalysisReport(new ArrayList<>(),
 				new ReleaseDifference(), new Release(), new Release()));
 		Mockito.when(upgradeStrategy.checkStatus(any()))
 				.thenReturn(true);
@@ -270,7 +274,7 @@ public class StateMachineTests {
 
 	@Test
 	public void testSimpleUpgradeShouldNotError() throws Exception {
-		Mockito.when(releaseReportService.createReport(any(), any(boolean.class))).thenReturn(new ReleaseAnalysisReport(new ArrayList<>(),
+		Mockito.when(releaseReportService.createReport(any(), any(), any(boolean.class))).thenReturn(new ReleaseAnalysisReport(new ArrayList<>(),
 				new ReleaseDifference(), new Release(), new Release()));
 		Mockito.when(upgradeStrategy.checkStatus(any()))
 				.thenReturn(true);
@@ -306,7 +310,7 @@ public class StateMachineTests {
 
 	@Test
 	public void testUpgradeFailsNewAppFailToDeploy() throws Exception {
-		Mockito.when(releaseReportService.createReport(any(), any(boolean.class))).thenReturn(new ReleaseAnalysisReport(new ArrayList<>(),
+		Mockito.when(releaseReportService.createReport(any(), any(), any(boolean.class))).thenReturn(new ReleaseAnalysisReport(new ArrayList<>(),
 				new ReleaseDifference(), new Release(), new Release()));
 		Mockito.when(upgradeStrategy.checkStatus(any()))
 				.thenReturn(false);
@@ -354,7 +358,7 @@ public class StateMachineTests {
 
 	@Test
 	public void testUpgradeCancelWhileCheckingApps() throws Exception {
-		Mockito.when(releaseReportService.createReport(any(), any(boolean.class))).thenReturn(new ReleaseAnalysisReport(new ArrayList<>(),
+		Mockito.when(releaseReportService.createReport(any(), any(), any(boolean.class))).thenReturn(new ReleaseAnalysisReport(new ArrayList<>(),
 				new ReleaseDifference(), new Release(), new Release()));
 		Mockito.when(upgradeStrategy.checkStatus(any()))
 				.thenReturn(false);
@@ -548,7 +552,7 @@ public class StateMachineTests {
 
 	@Test
 	public void testInstallDeniedWhileUpgrading() throws Exception {
-		Mockito.when(releaseReportService.createReport(any(), any(boolean.class))).thenReturn(new ReleaseAnalysisReport(new ArrayList<>(),
+		Mockito.when(releaseReportService.createReport(any(), any(), any(boolean.class))).thenReturn(new ReleaseAnalysisReport(new ArrayList<>(),
 				new ReleaseDifference(), new Release(), new Release()));
 		Mockito.when(upgradeStrategy.checkStatus(any()))
 				.thenReturn(false);

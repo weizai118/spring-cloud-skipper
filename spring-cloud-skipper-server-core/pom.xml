@@ -7,10 +7,11 @@
     <parent>
         <groupId>org.springframework.cloud</groupId>
         <artifactId>spring-cloud-skipper-parent</artifactId>
-        <version>1.0.3.BUILD-SNAPSHOT</version>
+        <version>1.1.0.BUILD-SNAPSHOT</version>
     </parent>
 
     <properties>
+        <cloudfoundry-java-lib.version>2.23.0.RELEASE</cloudfoundry-java-lib.version>
     </properties>
 
     <dependencies>
@@ -167,7 +168,7 @@
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-skipper</artifactId>
-            <version>1.0.3.BUILD-SNAPSHOT</version>
+            <version>1.1.0.BUILD-SNAPSHOT</version>
         </dependency>
          <dependency>
             <groupId>org.springframework.restdocs</groupId>
@@ -184,6 +185,10 @@
         <dependency>
             <groupId>org.springframework.security.oauth</groupId>
             <artifactId>spring-security-oauth2</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-skipper-platform-cloudfoundry</artifactId>
         </dependency>
     </dependencies>
     <build>

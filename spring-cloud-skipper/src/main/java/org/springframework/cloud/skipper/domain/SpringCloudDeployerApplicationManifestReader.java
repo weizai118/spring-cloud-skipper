@@ -17,6 +17,8 @@ package org.springframework.cloud.skipper.domain;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -39,43 +41,55 @@ import org.springframework.cloud.skipper.SkipperException;
  * @author Mark Pollack
  * @author Ilayaperumal Gopinathan
  */
-public class SpringCloudDeployerApplicationManifestReader {
+public class SpringCloudDeployerApplicationManifestReader implements SkipperManifestReader {
 
 	private final static Logger logger = LoggerFactory.getLogger(SpringCloudDeployerApplicationManifestReader.class);
 
 	public List<SpringCloudDeployerApplicationManifest> read(String manifest) {
-		assertSupportedKinds(manifest);
-		List<SpringCloudDeployerApplicationManifest> applicationSpecs = new ArrayList<>();
-		YAMLMapper mapper = new YAMLMapper();
-		mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-		try {
-			MappingIterator<SpringCloudDeployerApplicationManifest> it = mapper
-					.readerFor(SpringCloudDeployerApplicationManifest.class).readValues(manifest);
-			while (it.hasNextValue()) {
-				SpringCloudDeployerApplicationManifest appKind = it.next();
-				applicationSpecs.add(appKind);
+		if (canSupport(manifest)) {
+			List<SpringCloudDeployerApplicationManifest> applicationSpecs = new ArrayList<>();
+			YAMLMapper mapper = new YAMLMapper();
+			mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+			try {
+				MappingIterator<SpringCloudDeployerApplicationManifest> it = mapper.readerFor(
+						SpringCloudDeployerApplicationManifest.class).readValues(manifest);
+				while (it.hasNextValue()) {
+					SpringCloudDeployerApplicationManifest appKind = it.next();
+					applicationSpecs.add(appKind);
+				}
 			}
+			catch (JsonMappingException e) {
+				logger.error("Can't parse Package's manifest YAML = " + manifest);
+				throw new SkipperException("JsonMappingException - Can't parse Package's manifest YAML = " + manifest,
+						e);
+			}
+			catch (IOException e) {
+				logger.error("Can't parse Package's manifest YAML = " + manifest);
+				throw new SkipperException("IOException - Can't parse Package's manifest YAML = " + manifest, e);
+			}
+			return applicationSpecs;
 		}
-		catch (JsonMappingException e) {
-			logger.error("Can't parse Package's manifest YAML = " + manifest);
-			throw new SkipperException("JsonMappingException - Can't parse Package's manifest YAML = " + manifest, e);
-		}
-		catch (IOException e) {
-			logger.error("Can't parse Package's manifest YAML = " + manifest);
-			throw new SkipperException("IOException - Can't parse Package's manifest YAML = " + manifest, e);
-		}
-		return applicationSpecs;
+		return Collections.emptyList();
 	}
 
-	private void assertSupportedKinds(String manifest) {
+	public boolean canSupport(String manifest) {
 		Yaml yaml = new Yaml();
 		Iterable<Object> object = yaml.loadAll(manifest);
 		for (Object o : object) {
-			assertSupportedKind(o);
+			boolean supportKind = assertSupportedKind(o);
+			if (!supportKind) {
+				return false;
+			}
 		}
+		return true;
 	}
 
-	private void assertSupportedKind(Object object) {
+	public String[] getSupportedKinds() {
+		return new String[] {SkipperManifestKind.SpringBootApp.name(),
+				SkipperManifestKind.SpringCloudDeployerApplication.name()};
+	}
+
+	private boolean assertSupportedKind(Object object) {
 		if (object == null) {
 			throw new SkipperException("Can't parse manifest, it is empty");
 		}
@@ -89,12 +103,11 @@ public class SpringCloudDeployerApplicationManifestReader {
 		Object kindObject = manifestAsMap.get("kind");
 		if (kindObject instanceof String) {
 			String kind = (String) kindObject;
-			if (kind.equalsIgnoreCase("SpringBootApp") || kind.equalsIgnoreCase("SpringCloudDeployerApplication")) {
+			if (Arrays.asList(getSupportedKinds()).contains(kind)) {
 				logger.debug("Found supported kind " + kind);
-			}
-			else {
-				throw new SkipperException("No reader available to read all the kind " + kind);
+				return true;
 			}
 		}
+		return false;
 	}
 }

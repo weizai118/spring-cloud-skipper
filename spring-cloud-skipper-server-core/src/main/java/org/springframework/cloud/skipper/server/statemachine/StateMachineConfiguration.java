@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cloud.skipper.server.deployer.strategies.HealthCheckProperties;
 import org.springframework.cloud.skipper.server.deployer.strategies.UpgradeStrategy;
 import org.springframework.cloud.skipper.server.repository.ReleaseRepository;
 import org.springframework.cloud.skipper.server.service.ReleaseReportService;
@@ -56,6 +57,18 @@ public class StateMachineConfiguration {
 
 	private static final Logger log = LoggerFactory.getLogger(StateMachineConfiguration.class);
 
+	private static long adjustTimerPeriod(HealthCheckProperties healthCheckProperties) {
+		// keep hard coded default as 1000ms and use sleepInMillis from documented
+		// setting for now. Just make sure value is positive as otherwise
+		// machine would go crazy.
+		if (healthCheckProperties != null && healthCheckProperties.getSleepInMillis() > 0) {
+			return healthCheckProperties.getSleepInMillis();
+		}
+		else {
+			return 1000;
+		}
+	}
+
 	/**
 	 * Configuration defining {@link StateMachineFactory} for skipper release handling.
 	 */
@@ -77,6 +90,9 @@ public class StateMachineConfiguration {
 
 		@Autowired
 		private UpgradeStrategy upgradeStrategy;
+
+		@Autowired
+		private HealthCheckProperties healthCheckProperties;
 
 		@Autowired
 		private StateMachineRuntimePersister<SkipperStates, SkipperEvents, String> stateMachineRuntimePersister;
@@ -216,7 +232,7 @@ public class StateMachineConfiguration {
 					.and()
 				.withExternal()
 					.source(SkipperStates.UPGRADE_WAIT_TARGET_APPS).target(SkipperStates.UPGRADE_CHECK_CHOICE)
-					.timer(1000)
+					.timer(adjustTimerPeriod(healthCheckProperties))
 					.and()
 				.withExternal()
 					.source(SkipperStates.UPGRADE_CHECK_TARGET_APPS).target(SkipperStates.UPGRADE_WAIT_TARGET_APPS)
@@ -317,7 +333,7 @@ public class StateMachineConfiguration {
 
 		@Bean
 		public UpgradeDeployTargetAppsAction upgradeDeployTargetAppsAction() {
-			return new UpgradeDeployTargetAppsAction(releaseReportService, upgradeStrategy);
+			return new UpgradeDeployTargetAppsAction(releaseReportService, upgradeStrategy, healthCheckProperties);
 		}
 
 		@Bean
